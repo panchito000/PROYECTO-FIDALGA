@@ -7,6 +7,7 @@ import { LoginSidebar } from './LoginSidebar';
 import { CartSidebar } from './CartSidebar';
 import { useCart } from '@/context/CartContext';
 
+
 export const Navbar = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -19,7 +20,7 @@ export const Navbar = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
-      router.push(`/buscar?q=${encodeURIComponent(searchTerm)}`);
+      router.push(`/search?q=${encodeURIComponent(searchTerm)}`);
     }
   };
 
