@@ -1,7 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+
+// SUPABASE TEMPORALMENTE DESACTIVADO
+// La conexión se mantiene comentada porque todavía no tenemos
+// configuradas las credenciales de Supabase en este entorno.
+//
+// Cuando tengamos:
+// NEXT_PUBLIC_SUPABASE_URL
+// NEXT_PUBLIC_SUPABASE_ANON_KEY
+//
+// se puede volver a activar simplemente quitando los comentarios.
+//
+// import { createClient } from '@/utils/supabase/client';
 
 interface LoginSidebarProps {
   isOpen: boolean;
@@ -14,52 +25,85 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient();
+  // SUPABASE TEMPORALMENTE DESACTIVADO
+  // Se mantiene esta línea comentada para conservar la implementación original.
+  //
+  // const supabase = createClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // ============================================================
+    // SUPABASE TEMPORALMENTE DESACTIVADO
+    // ============================================================
+    // La autenticación queda preparada para volver a utilizarse
+    // cuando estén disponibles las credenciales de Supabase.
+    //
+    // const { error } = await supabase.auth.signInWithPassword({
+    //   email,
+    //   password,
+    // });
+    //
+    // if (error) {
+    //   setError('Correo o contraseña incorrectos.');
+    //   setLoading(false);
+    // } else {
+    //   setLoading(false);
+    //   onClose();
+    // }
+    // ============================================================
 
-    if (error) {
-      setError('Correo o contraseña incorrectos.');
+    // Simulación temporal para poder probar la interfaz
+    // mientras Supabase no está configurado.
+    setTimeout(() => {
       setLoading(false);
-    } else {
-      setLoading(false);
-      onClose(); // Cerramos el panel al iniciar sesión con éxito
-      // Aquí podrías recargar la página o actualizar el estado del usuario
-    }
+      setError('El inicio de sesión estará disponible próximamente.');
+    }, 500);
   };
 
   return (
     <>
       {/* Fondo oscuro transparente (Overlay) */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 z-40 transition-opacity"
           onClick={onClose}
         />
       )}
 
       {/* Panel Lateral */}
-      <div 
+      <div
         className={`fixed top-0 right-0 h-full w-full sm:w-100 bg-white z-50 transform transition-transform duration-300 ease-in-out shadow-2xl flex flex-col ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Cabecera del Sidebar */}
         <div className="flex justify-between items-center p-6 pb-2">
-          <h2 className="text-lg font-black text-gray-900 tracking-wide">INGRESAR</h2>
-          <button 
+          <h2 className="text-lg font-black text-gray-900 tracking-wide">
+            INGRESAR
+          </h2>
+
+          <button
             onClick={onClose}
             className="bg-gray-500 hover:bg-gray-600 text-white rounded p-1 transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
           </button>
         </div>
 
@@ -70,16 +114,19 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
           </p>
 
           <form onSubmit={handleLogin} className="space-y-4">
+            {/* Mensaje de error / aviso */}
             {error && (
               <div className="text-red-500 text-xs font-bold text-center bg-red-50 p-2 rounded">
                 {error}
               </div>
             )}
 
+            {/* Correo electrónico */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Correo electrónico
               </label>
+
               <input
                 type="email"
                 placeholder="Correo electrónico"
@@ -90,10 +137,12 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
               />
             </div>
 
+            {/* Contraseña */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Contraseña
               </label>
+
               <input
                 type="password"
                 placeholder="Contraseña"
@@ -104,6 +153,7 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
               />
             </div>
 
+            {/* Botón Login */}
             <button
               type="submit"
               disabled={loading}
@@ -113,14 +163,19 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
             </button>
           </form>
 
+          {/* Recuperar contraseña */}
           <div className="text-center mt-4 mb-8">
-            <a href="#" className="text-[#00c653] text-xs font-semibold hover:underline">
+            <a
+              href="#"
+              className="text-[#00c653] text-xs font-semibold hover:underline"
+            >
               ¿Olvidó su contraseña?
             </a>
           </div>
 
           <hr className="border-gray-200 mb-6" />
 
+          {/* Crear cuenta */}
           <p className="text-xs text-gray-500 text-center mb-4 px-4">
             Crea tu cuenta y disfrute de nuestra nueva experiencia de compra
           </p>
