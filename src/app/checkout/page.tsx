@@ -1,21 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { Input } from "@/components/Input";
 import { useCart } from "@/context/CartContext";
+import { createClient } from "@/utils/supabase/client";
 
 type DeliveryMethod = "envio" | "retiro";
 type PaymentMethod = "efectivo" | "qr";
 
 export default function CheckoutPage() {
-  const { items, cartTotal, updateQuantity } = useCart();
+  const router = useRouter();
 
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [deliveryMethod, setDeliveryMethod] =
     useState<DeliveryMethod>("envio");
-
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>("efectivo");
+
+  const { items, cartTotal, updateQuantity } = useCart();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const supabase = createClient();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      setCheckingAuth(false);
+    };
+
+    checkUser();
+  }, [router]);
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-500 text-sm">
+          Verificando sesión...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -203,6 +236,7 @@ export default function CheckoutPage() {
                         {/* Información */}
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between gap-3">
+
                             <div>
                               <p className="text-sm font-bold text-gray-800 leading-tight">
                                 {item.title}
@@ -220,6 +254,7 @@ export default function CheckoutPage() {
 
                           {/* Cantidad */}
                           <div className="flex items-center gap-3 mt-3">
+
                             <button
                               type="button"
                               onClick={() =>
@@ -246,6 +281,7 @@ export default function CheckoutPage() {
                             >
                               −
                             </button>
+
                           </div>
                         </div>
                       </div>
