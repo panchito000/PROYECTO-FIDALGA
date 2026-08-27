@@ -14,13 +14,27 @@ export default function CheckoutPage() {
   const router = useRouter();
 
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [processingOrder, setProcessingOrder] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(false);
+
+  const [email, setEmail] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [nit, setNit] = useState("");
+  const [razonSocial, setRazonSocial] = useState("");
+
   const [deliveryMethod, setDeliveryMethod] =
     useState<DeliveryMethod>("envio");
+
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>("efectivo");
 
-  const { items, cartTotal, updateQuantity } = useCart();
+  const { items, cartTotal, updateQuantity, clearCart } = useCart();
 
+  // ============================================================
+  // T3: Verificar que exista una sesión antes de entrar al checkout
+  // ============================================================
   useEffect(() => {
     const checkUser = async () => {
       const supabase = createClient();
@@ -34,18 +48,181 @@ export default function CheckoutPage() {
         return;
       }
 
+      // T3: Obtener el correo del usuario autenticado
+      setEmail(user.email || "");
+
+      // T3: Obtener el perfil del usuario desde perfiles_usuario
+      const { data: perfil, error: perfilError } = await supabase
+        .from("perfiles_usuario")
+        .select("nombre_completo, telefono, direccion")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (perfilError) {
+        console.error("Error al obtener el perfil:", perfilError);
+      }
+
+      // T3: Cargar automáticamente los datos existentes del perfil
+      if (perfil) {
+        setNombre(perfil.nombre_completo || "");
+        setTelefono(perfil.telefono || "");
+        setDireccion(perfil.direccion || "");
+      }
+
       setCheckingAuth(false);
     };
 
     checkUser();
   }, [router]);
 
+  // ============================================================
+  // T3: Finalizar pedido
+  // Guarda el pedido mediante /api/pedidos
+  // ============================================================
+  const handleFinalizarPedido = async () => {
+    if (items.length === 0) {
+      alert("Tu carrito está vacío.");
+      return;
+    }
+
+    // Validar datos obligatorios
+    if (!nombre.trim()) {
+      alert("Por favor, ingresa tu nombre completo.");
+      return;
+    }
+
+    if (deliveryMethod === "envio" && !direccion.trim()) {
+      alert("Por favor, ingresa una dirección de entrega.");
+      return;
+    }
+
+    if (!telefono.trim()) {
+      alert("Por favor, ingresa tu teléfono.");
+      return;
+    }
+
+    if (!nit.trim()) {
+      alert("Por favor, ingresa tu NIT o CI.");
+      return;
+    }
+
+    if (!razonSocial.trim()) {
+      alert("Por favor, ingresa la razón social.");
+      return;
+    }
+
+    try {
+      setProcessingOrder(true);
+
+      const direccionFinal =
+        deliveryMethod === "envio"
+          ? direccion.trim()
+          : "Retiro en tienda";
+
+      // T3: Preparar los productos del carrito para la base de datos
+      const pedidoItems = items.map((item) => ({
+        producto_id: item.id,
+        cantidad: item.qty,
+        precio_unitario: item.price,
+      }));
+
+      // T3: Calcular el total incluyendo el costo de envío
+      const costoEnvio = deliveryMethod === "envio" ? 12 : 0;
+
+      const totalFinal = cartTotal + costoEnvio;
+
+      // T3: Enviar el pedido a nuestra API
+      const response = await fetch("/api/pedidos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nombre_completo: nombre.trim(),
+          direccion_entrega: direccionFinal,
+          telefono: telefono.trim(),
+          metodo_pago: paymentMethod,
+          total: totalFinal,
+          items: pedidoItems,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || "No se pudo crear el pedido."
+        );
+      }
+
+      console.log("Pedido creado correctamente:", data);
+
+      // T3: Vaciar el carrito solamente después de guardar
+      // correctamente el pedido en la base de datos
+      clearCart();
+
+      // T3: Mostrar mensaje de pedido realizado correctamente
+      setOrderSuccess(true);
+
+      // T3: Después de unos segundos volver al inicio
+      setTimeout(() => {
+        router.push("/");
+      }, 2500);
+    } catch (error: any) {
+      console.error("Error al crear el pedido:", error);
+
+      alert(
+        `No se pudo realizar el pedido.\n\n${
+          error?.message || "Error desconocido."
+        }`
+      );
+    } finally {
+      setProcessingOrder(false);
+    }
+  };
+
+  // ============================================================
+  // T3: Pantalla mientras verificamos la sesión
+  // ============================================================
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <p className="text-gray-500 text-sm">
           Verificando sesión...
         </p>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // T3: Mensaje de éxito después de guardar el pedido
+  // ============================================================
+  if (orderSuccess) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Navbar />
+
+        <main className="min-h-[70vh] flex items-center justify-center px-6">
+          <div className="text-center">
+            <div className="mx-auto mb-5 w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+              <span className="text-3xl text-[#00c653]">
+                ✓
+              </span>
+            </div>
+
+            <h1 className="text-2xl font-bold text-gray-900">
+              ¡Pedido realizado correctamente!
+            </h1>
+
+            <p className="text-gray-500 text-sm mt-3">
+              Tu pedido ha sido registrado correctamente.
+            </p>
+
+            <p className="text-gray-400 text-xs mt-2">
+              Volviendo al inicio...
+            </p>
+          </div>
+        </main>
       </div>
     );
   }
@@ -57,7 +234,9 @@ export default function CheckoutPage() {
       <main className="w-full max-w-[1200px] mx-auto px-6 md:px-10 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-12">
 
-          {/* COLUMNA IZQUIERDA */}
+          {/* ======================================================
+              COLUMNA IZQUIERDA
+          ====================================================== */}
           <section className="w-full">
 
             {/* Contacto */}
@@ -71,6 +250,8 @@ export default function CheckoutPage() {
                 label="Correo electrónico"
                 placeholder="nombre@ejemplo.com"
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
@@ -113,30 +294,54 @@ export default function CheckoutPage() {
                     id="nombre"
                     label="Nombre Completo"
                     placeholder="Juan Pérez"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
                   />
 
                   <Input
                     id="direccion"
                     label="Dirección de entrega"
                     placeholder="Calle Principal 123, Depto 4B"
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
                   />
 
                   <Input
                     id="telefono"
                     label="Teléfono celular"
                     placeholder="+591 7 123 4567"
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
                   />
                 </>
               ) : (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <p className="text-sm font-semibold text-gray-800">
-                    Retiro en tienda
-                  </p>
+                <>
+                  <Input
+                    id="nombre-retiro"
+                    label="Nombre Completo"
+                    placeholder="Juan Pérez"
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                  />
 
-                  <p className="text-sm text-gray-600 mt-1">
-                    Podrás recoger tu pedido en una tienda Fidalga.
-                  </p>
-                </div>
+                  <Input
+                    id="telefono-retiro"
+                    label="Teléfono celular"
+                    placeholder="+591 7 123 4567"
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
+                  />
+
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                    <p className="text-sm font-semibold text-gray-800">
+                      Retiro en tienda
+                    </p>
+
+                    <p className="text-sm text-gray-600 mt-1">
+                      Podrás recoger tu pedido en una tienda Fidalga.
+                    </p>
+                  </div>
+                </>
               )}
             </div>
 
@@ -150,12 +355,16 @@ export default function CheckoutPage() {
                 id="nit"
                 label="NIT o CI"
                 placeholder="1234567890"
+                value={nit}
+                onChange={(e) => setNit(e.target.value)}
               />
 
               <Input
                 id="razon"
                 label="Razón Social (Nombre para Factura)"
                 placeholder="Empresa S.A."
+                value={razonSocial}
+                onChange={(e) => setRazonSocial(e.target.value)}
               />
             </div>
 
@@ -193,7 +402,9 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          {/* COLUMNA DERECHA */}
+          {/* ======================================================
+              COLUMNA DERECHA
+          ====================================================== */}
           <aside className="w-full">
             <div className="bg-[#f4f5f6] rounded-xl p-6 shadow-sm">
 
@@ -258,7 +469,10 @@ export default function CheckoutPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                updateQuantity(item.id, item.qty + 1)
+                                updateQuantity(
+                                  item.id,
+                                  item.qty + 1
+                                )
                               }
                               className="w-6 h-6 rounded-full border border-gray-400 bg-white flex items-center justify-center text-gray-700 text-sm font-bold hover:bg-gray-100"
                               aria-label="Aumentar cantidad"
@@ -273,7 +487,10 @@ export default function CheckoutPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                updateQuantity(item.id, item.qty - 1)
+                                updateQuantity(
+                                  item.id,
+                                  item.qty - 1
+                                )
                               }
                               disabled={item.qty <= 1}
                               className="w-6 h-6 rounded-full border border-gray-400 bg-white flex items-center justify-center text-gray-700 text-sm font-bold hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -290,6 +507,7 @@ export default function CheckoutPage() {
 
                   {/* Subtotal */}
                   <div className="py-3">
+
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-500">
                         Subtotal
@@ -306,9 +524,13 @@ export default function CheckoutPage() {
                       </span>
 
                       <span className="font-semibold text-gray-700">
-                        Bs. {deliveryMethod === "envio" ? "12.00" : "0.00"}
+                        Bs.{" "}
+                        {deliveryMethod === "envio"
+                          ? "12.00"
+                          : "0.00"}
                       </span>
                     </div>
+
                   </div>
 
                   {/* Total */}
@@ -326,16 +548,23 @@ export default function CheckoutPage() {
                     </span>
                   </div>
 
-                  {/* T3: todavía NO guarda el pedido */}
+                  {/* ==================================================
+                      T3: Guardar pedido y finalizar compra
+                  ================================================== */}
                   <button
                     type="button"
-                    className="w-full h-10 bg-[#00c653] hover:bg-[#00b84c] text-white font-bold text-sm rounded-lg transition-colors"
+                    onClick={handleFinalizarPedido}
+                    disabled={processingOrder}
+                    className="w-full h-10 bg-[#00c653] hover:bg-[#00b84c] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold text-sm rounded-lg transition-colors"
                   >
-                    Finalizar Pedido
+                    {processingOrder
+                      ? "Procesando pedido..."
+                      : "Finalizar Pedido"}
                   </button>
 
                   {/* Seguridad */}
                   <div className="flex justify-center items-center gap-2 mt-5">
+
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="15"
@@ -354,12 +583,14 @@ export default function CheckoutPage() {
                         rx="2"
                         ry="2"
                       />
+
                       <path d="M8 11V7a4 4 0 0 1 8 0v4" />
                     </svg>
 
                     <p className="text-[11px] text-gray-400">
                       Pago 100% Seguro y Encriptado
                     </p>
+
                   </div>
 
                 </div>
