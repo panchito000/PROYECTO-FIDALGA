@@ -54,80 +54,87 @@ export const pedidosService = {
     return data || [];
   },
 
-  // T3: Registrar un pedido de compra en la base de datos
+  
+  // T3 + T4 + T5: Crear pedido, guardar detalles y descontar stock
   async crearPedido(input: PedidoInput) {
     const supabase = createClient();
 
-    // T3: Obtener el usuario actualmente autenticado
+    // Obtener usuario autenticado
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
 
-    // T3: Si no existe una sesión, no permitimos crear el pedido
-    if (!user) {
-      throw new Error('Debes iniciar sesión para realizar un pedido.');
-    }
-
-    // T3: Obtener los datos del perfil del usuario
-    const { data: perfil, error: perfilError } = await supabase
-      .from('perfiles_usuario')
-      .select('id, nombre_completo, telefono')
-      .eq('id', user.id)
-      .single();
-
-    if (perfilError) {
+    if (authError || !user) {
       throw new Error(
-        `No se pudo obtener el perfil del usuario: ${perfilError.message}`
+        "Debes iniciar sesión para realizar un pedido."
       );
     }
 
-    // T3: Crear la cabecera del pedido utilizando
-    // las columnas que realmente existen en la tabla 'pedidos'
-    const { data: pedidoData, error: pedidoError } = await supabase
-      .from('pedidos')
-      .insert([
-        {
-          cliente_id: perfil.id,
-          nombre_completo: input.nombre_completo || perfil.nombre_completo,
-          telefono: input.telefono || perfil.telefono,
-          direccion_entrega: input.direccion_entrega,
-          metodo_pago: input.metodo_pago,
-          total: input.total,
-          estado_pedido: 'Pendiente',
-        },
-      ])
-      .select()
-      .single();
-
-    if (pedidoError) {
-      throw new Error(
-        `No se pudo crear el pedido: ${pedidoError.message}`
-      );
+    if (!input.items || input.items.length === 0) {
+      throw new Error("El carrito está vacío.");
     }
 
-    // T3: Registrar cada producto del carrito
-    if (input.items && input.items.length > 0) {
-      const detallesFormateados = input.items.map((item) => ({
-        pedido_id: pedidoData.id,
-        producto_id: item.producto_id,
-        cantidad: item.cantidad,
-        precio_unitario: item.precio_unitario,
-      }));
+    // Preparar productos para Supabase
+    const items = input.items.map((item) => ({
+      producto_id: item.producto_id,
+      cantidad: Number(item.cantidad),
+      precio_unitario: Number(item.precio_unitario),
+    }));
 
-      const { error: detallesError } = await supabase
-        .from('detalles_pedido')
-        .insert(detallesFormateados);
+    // Validar cantidades
+    for (const item of items) {
+      if (!item.producto_id) {
+        throw new Error("Uno de los productos del pedido no tiene un ID válido.");
+      }
 
-      if (detallesError) {
+      if (!Number.isInteger(item.cantidad) || item.cantidad <= 0) {
         throw new Error(
-          `El pedido se creó, pero no se pudieron guardar sus productos: ${detallesError.message}`
+          "La cantidad de uno de los productos no es válida."
+        );
+      }
+
+      if (!Number.isFinite(item.precio_unitario) || item.precio_unitario < 0) {
+        throw new Error(
+          "El precio de uno de los productos no es válido."
         );
       }
     }
 
-    // T3: Devolver el pedido creado
-    return pedidoData;
+    // T3 + T4 + T5:
+    // La función de Supabase crea el pedido,
+    // registra sus detalles,
+    // guarda origen = 'web'
+    // y descuenta el stock de forma segura.
+    const { data, error } = await supabase.rpc(
+      "crear_pedido_web",
+      {
+        p_cliente_id: user.id,
+        p_nombre_completo: input.nombre_completo,
+        p_telefono: input.telefono || null,
+        p_direccion_entrega: input.direccion_entrega,
+        p_metodo_pago: input.metodo_pago,
+        p_total: input.total,
+        p_items: items,
+      }
+    );
+
+    if (error) {
+      console.error(
+        "Error al crear pedido:",
+        error
+      );
+
+      throw new Error(
+        error.message ||
+          "No se pudo crear el pedido."
+      );
+    }
+
+    return data;
   },
+  
+
 
   // Actualizar el estado de entrega de un pedido
   async actualizarEstado(pedidoId: string, nuevoEstado: string) {
