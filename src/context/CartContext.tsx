@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // Interfaz del producto adaptada para leer el UUID (string) de tu base de datos
 export interface CartItem {
@@ -22,6 +22,7 @@ interface CartContextType {
 
   cartCount: number;
   cartTotal: number;
+  isLoaded: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -32,6 +33,25 @@ export const CartProvider = ({
   children: React.ReactNode;
 }) => {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const savedCart = localStorage.getItem('fidalga_cart');
+    if (savedCart) {
+      try {
+        setItems(JSON.parse(savedCart));
+      } catch (e) {
+        console.error('Error parsing cart', e);
+      }
+    }
+    setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('fidalga_cart', JSON.stringify(items));
+    }
+  }, [items, isLoaded]);
 
   // T3: vacía completamente el carrito después de realizar un pedido correctamente
   const clearCart = () => {
@@ -100,6 +120,7 @@ export const CartProvider = ({
 
         cartCount,
         cartTotal,
+        isLoaded,
       }}
     >
       {children}
