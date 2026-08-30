@@ -5,14 +5,17 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEye, faEyeSlash, faUserShield, faUser } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faUserShield, faUser, faCircleNotch } from '@fortawesome/free-solid-svg-icons';
+
+const ADMIN_ROL_ID = 'd9f76488-9905-459d-adde-0d0e87e5efd9';
+const EMPLEADO_ROL_ID = '703d17fd-bfb6-40d1-b378-98362e9cb3b0';
+const CLIENTE_ROL_ID = 'e20d562b-85ad-440c-8640-d36978cdbcb4';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  const [tipoAcceso, setTipoAcceso] = useState<'cliente' | 'admin'>('cliente');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -50,19 +53,14 @@ export default function LoginPage() {
       // Obtener rol del perfil
       const { data: perfil } = await supabase
         .from('perfiles_usuario')
-        .select('rol')
+        .select('rol_id')
         .eq('id', user.id)
         .single();
 
-      const rolUsuario = perfil?.rol || user?.user_metadata?.rol || (email.endsWith('@fidalga.com') ? 'admin' : 'cliente');
-
-      // Validar acceso si es administrador
-      if (tipoAcceso === 'admin' && rolUsuario !== 'admin') {
-        throw new Error('Esta cuenta no posee privilegios de administrador.');
-      }
+      const rolUsuario = perfil?.rol_id || user?.user_metadata?.rol_id || CLIENTE_ROL_ID;
 
       // Redirigir según el rol
-      if (rolUsuario === 'admin' || tipoAcceso === 'admin') {
+      if (rolUsuario === ADMIN_ROL_ID || rolUsuario === EMPLEADO_ROL_ID) {
         router.push('/admin');
       } else {
         router.push('/');
@@ -95,33 +93,7 @@ export default function LoginPage() {
           Acceso al Sistema
         </h2>
 
-        {/* Cambiar entre Cliente y Administrador */}
-        <div className="flex bg-gray-100 p-1 rounded-lg mb-6 border border-gray-200">
-          <button
-            type="button"
-            onClick={() => { setTipoAcceso('cliente'); setError(null); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${
-              tipoAcceso === 'cliente' 
-                ? 'bg-white text-[#00b24a] shadow-xs' 
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <FontAwesomeIcon icon={faUser} />
-            Cliente
-          </button>
-          <button
-            type="button"
-            onClick={() => { setTipoAcceso('admin'); setError(null); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${
-              tipoAcceso === 'admin' 
-                ? 'bg-gray-900 text-white shadow-xs' 
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <FontAwesomeIcon icon={faUserShield} />
-            Administrador
-          </button>
-        </div>
+
 
         {mensaje && (
           <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm text-center font-medium">
@@ -143,7 +115,7 @@ export default function LoginPage() {
             <input
               type="email"
               required
-              placeholder={tipoAcceso === 'admin' ? "admin@fidalga.com" : "usuario@fidalga.com"}
+              placeholder="ejemplo@correo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#00b24a] focus:border-[#00b24a] transition-colors"
@@ -176,13 +148,16 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full font-bold py-2.5 rounded-md transition-colors mt-4 disabled:opacity-50 text-white ${
-              tipoAcceso === 'admin' 
-                ? 'bg-gray-900 hover:bg-gray-800' 
-                : 'bg-[#00b24a] hover:bg-[#009e42]'
-            }`}
+            className="w-full font-bold py-2.5 rounded-md transition-colors mt-4 disabled:opacity-50 text-white bg-[#00b24a] hover:bg-[#009e42] flex items-center justify-center gap-2"
           >
-            {loading ? 'Cargando...' : tipoAcceso === 'admin' ? 'Ingresar a Administración' : 'Ingresar'}
+            {loading ? (
+              <>
+                <FontAwesomeIcon icon={faCircleNotch} spin />
+                Cargando...
+              </>
+            ) : (
+              'Ingresar'
+            )}
           </button>
         </form>
 

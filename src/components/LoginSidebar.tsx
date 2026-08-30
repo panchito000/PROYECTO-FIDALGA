@@ -10,8 +10,12 @@ interface LoginSidebarProps {
   onClose: () => void;
 }
 
+const ADMIN_ROL_ID = 'd9f76488-9905-459d-adde-0d0e87e5efd9';
+const EMPLEADO_ROL_ID = '703d17fd-bfb6-40d1-b378-98362e9cb3b0';
+
 export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
   const [user, setUser] = useState<any>(null);
+  const [perfil, setPerfil] = useState<any>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,6 +28,10 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      if (user) {
+        const { data } = await supabase.from('perfiles_usuario').select('nombre_completo, rol_id').eq('id', user.id).single();
+        if (data) setPerfil(data);
+      }
     };
 
     if (isOpen) {
@@ -54,6 +62,8 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
       setLoading(false);
     } else {
       setUser(data.user);
+      const { data: perfilData } = await supabase.from('perfiles_usuario').select('nombre_completo, rol_id').eq('id', data.user.id).single();
+      if (perfilData) setPerfil(perfilData);
       setLoading(false);
       onClose();
       router.refresh();
@@ -64,8 +74,10 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
     setLoading(true);
     await supabase.auth.signOut();
     setUser(null);
+    setPerfil(null);
     setLoading(false);
     onClose();
+    router.push('/');
     router.refresh();
   };
 
@@ -105,11 +117,11 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
             <div className="space-y-6">
               <div className="flex items-center gap-4 p-4 bg-green-50 rounded-2xl border border-green-100">
                 <div className="w-14 h-14 bg-[#00c653] text-white rounded-full flex items-center justify-center font-black text-xl shadow-sm">
-                  {user.email ? user.email.substring(0, 2).toUpperCase() : 'US'}
+                  {perfil?.nombre_completo ? perfil.nombre_completo.substring(0, 2).toUpperCase() : (user?.user_metadata?.nombre_completo ? user.user_metadata.nombre_completo.substring(0, 2).toUpperCase() : 'US')}
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-xs text-gray-400 uppercase font-bold">Sesión Activa</p>
-                  <p className="text-sm font-bold text-gray-900 truncate">{user.email}</p>
+                  <p className="text-sm font-bold text-gray-900 truncate">{perfil?.nombre_completo || user?.user_metadata?.nombre_completo || 'Cliente'}</p>
                 </div>
               </div>
 
@@ -119,18 +131,20 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
                   onClick={onClose}
                   className="w-full flex items-center justify-between p-3.5 bg-gray-50 hover:bg-gray-100 rounded-xl font-bold text-gray-800 text-sm transition-colors"
                 >
-                  <span>Historial de Compras</span>
+                  <span>Mi Perfil y Pedidos</span>
                   <span>&rarr;</span>
                 </Link>
 
-                <Link
-                  href="/admin"
-                  onClick={onClose}
-                  className="w-full flex items-center justify-between p-3.5 bg-gray-50 hover:bg-gray-100 rounded-xl font-bold text-gray-800 text-sm transition-colors"
-                >
-                  <span>Panel Administrativo</span>
-                  <span>&rarr;</span>
-                </Link>
+                {(perfil?.rol_id === ADMIN_ROL_ID || perfil?.rol_id === EMPLEADO_ROL_ID || user?.user_metadata?.rol_id === ADMIN_ROL_ID) && (
+                  <Link
+                    href="/admin"
+                    onClick={onClose}
+                    className="w-full flex items-center justify-between p-3.5 bg-gray-50 hover:bg-gray-100 rounded-xl font-bold text-gray-800 text-sm transition-colors"
+                  >
+                    <span>Panel Administrativo</span>
+                    <span>&rarr;</span>
+                  </Link>
+                )}
               </div>
 
               <hr className="border-gray-100" />
@@ -164,7 +178,7 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
                   <input
                     type="email"
                     placeholder="ejemplo@correo.com"
-                    className="w-full border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:border-[#00c653] focus:ring-1 focus:ring-[#00c653]"
+                    className="w-full border border-gray-300 rounded-full px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-[#00c653] focus:ring-1 focus:ring-[#00c653]"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -178,7 +192,7 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
                   <input
                     type="password"
                     placeholder="••••••••"
-                    className="w-full border border-gray-300 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:border-[#00c653] focus:ring-1 focus:ring-[#00c653]"
+                    className="w-full border border-gray-300 rounded-full px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-[#00c653] focus:ring-1 focus:ring-[#00c653]"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -188,9 +202,19 @@ export const LoginSidebar = ({ isOpen, onClose }: LoginSidebarProps) => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-[#00c653] hover:bg-[#00a846] text-white font-bold py-3.5 rounded-full mt-2 transition-colors text-sm shadow-sm disabled:opacity-50"
+                  className="w-full bg-[#00c653] hover:bg-[#00a846] text-white font-bold py-3.5 rounded-full mt-2 transition-colors text-sm shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {loading ? 'Ingresando...' : 'Iniciar Sesión'}
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Ingresando...
+                    </>
+                  ) : (
+                    'Iniciar Sesión'
+                  )}
                 </button>
               </form>
 
