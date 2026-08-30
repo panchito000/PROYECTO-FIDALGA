@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 
+const ADMIN_ROL_ID = 'd9f76488-9905-459d-adde-0d0e87e5efd9';
+const EMPLEADO_ROL_ID = '703d17fd-bfb6-40d1-b378-98362e9cb3b0';
+
 export const metadata = {
   title: 'Admin | Fidalga',
 };
@@ -21,11 +24,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // Verificar rol en Supabase
   const { data: perfil } = await supabase
     .from('perfiles_usuario')
-    .select('rol')
+    .select('rol_id')
     .eq('id', user.id)
     .single();
 
-  const esAdmin = perfil?.rol === 'admin' || user.user_metadata?.rol === 'admin' || user.email?.endsWith('@fidalga.com');
+  const esAdmin = perfil?.rol_id === ADMIN_ROL_ID || perfil?.rol_id === EMPLEADO_ROL_ID || user.user_metadata?.rol_id === ADMIN_ROL_ID || user.email?.endsWith('@fidalga.com');
 
   if (!esAdmin) {
     redirect('/login?error=no-admin');

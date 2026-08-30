@@ -262,6 +262,12 @@ export default function CheckoutPage() {
           total:
             totalFinal,
 
+          nit:
+            nit.trim(),
+
+          razon_social:
+            razonSocial.trim(),
+
           items:
             pedidoItems,
         });
