@@ -32,7 +32,11 @@ interface OfertaItem {
     nombre: string;
     precio: number;
     imagen_url?: string;
-  };
+  } | {
+    nombre: string;
+    precio: number;
+    imagen_url?: string;
+  }[];
 }
 
 interface OfertasClientProps {

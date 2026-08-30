@@ -37,7 +37,17 @@ export default function CheckoutPage() {
     cartTotal,
     updateQuantity,
     clearCart,
+    isLoaded,
   } = useCart();
+
+  // ============================================================
+  // Redirigir al inicio si el carrito está vacío y ya cargó
+  // ============================================================
+  useEffect(() => {
+    if (isLoaded && items.length === 0 && !orderSuccess) {
+      router.replace("/");
+    }
+  }, [isLoaded, items.length, orderSuccess, router]);
 
   // ============================================================
   // T3: Verificar que exista una sesión antes de entrar al checkout
@@ -252,6 +262,12 @@ export default function CheckoutPage() {
           total:
             totalFinal,
 
+          nit:
+            nit.trim(),
+
+          razon_social:
+            razonSocial.trim(),
+
           items:
             pedidoItems,
         });
@@ -306,9 +322,9 @@ export default function CheckoutPage() {
   };
 
   // ============================================================
-  // T3: Pantalla mientras verificamos la sesión
+  // T3: Pantalla mientras verificamos la sesión o el carrito
   // ============================================================
-  if (checkingAuth) {
+  if (checkingAuth || !isLoaded) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <p className="text-gray-500 text-sm">
@@ -359,6 +375,13 @@ export default function CheckoutPage() {
       <Navbar />
 
       <main className="w-full max-w-[1200px] mx-auto px-6 md:px-10 py-10">
+
+        <button 
+          onClick={() => router.back()} 
+          className="mb-6 flex items-center text-sm font-bold text-gray-500 hover:text-[#00c653] transition-colors w-fit"
+        >
+          ← Volver atrás
+        </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-12">
 

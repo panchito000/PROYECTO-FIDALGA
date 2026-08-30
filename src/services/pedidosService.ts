@@ -16,6 +16,8 @@ export interface PedidoInput {
   direccion_entrega: string;
   metodo_pago: string;
   total: number;
+  nit: string;
+  razon_social: string;
 
   // T3: Productos que contiene el pedido
   items: DetallePedidoInput[];
@@ -115,6 +117,8 @@ export const pedidosService = {
         p_direccion_entrega: input.direccion_entrega,
         p_metodo_pago: input.metodo_pago,
         p_total: input.total,
+        p_nit: input.nit || "",
+        p_razon_social: input.razon_social || "",
         p_items: items,
       }
     );
