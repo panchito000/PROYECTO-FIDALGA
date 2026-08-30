@@ -75,7 +75,7 @@ export const Navbar = () => {
             <button onClick={() => setIsLoginOpen(true)} className="flex flex-col items-center gap-0.5 hover:text-gray-100 transition-colors">
               <FontAwesomeIcon icon={faUser} className="text-lg sm:text-xl" />
               <span className="text-[10px] sm:text-xs font-semibold">
-                {user ? 'Mi Cuenta' : 'Registrarse'}
+                {user ? 'Mi Cuenta' : 'Ingresar'}
               </span>
             </button>
             

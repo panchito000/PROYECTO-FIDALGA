@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEye, faEyeSlash, faUser, faUserShield } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faUser, faUserShield, faCircleNotch } from '@fortawesome/free-solid-svg-icons';
 
 /**
  * Página para crear una nueva cuenta de cliente o administrador en Fidalga.
@@ -14,11 +14,10 @@ export default function RegistroPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const [rol, setRol] = useState<'cliente' | 'admin'>('cliente');
   const [nombreCompleto, setNombreCompleto] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [claveAdmin, setClaveAdmin] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,12 +28,7 @@ export default function RegistroPage() {
     setLoading(true);
     setError(null);
 
-    // Validar clave de autorización para cuentas de administrador
-    if (rol === 'admin' && claveAdmin && !['fidalga2026', 'admin', '1234'].includes(claveAdmin.toLowerCase()) && !email.endsWith('@fidalga.com')) {
-      setError('Clave de autorización no válida. Usa: fidalga2026 o admin');
-      setLoading(false);
-      return;
-    }
+
 
     try {
       // Registrar usuario en Supabase Auth
@@ -44,27 +38,17 @@ export default function RegistroPage() {
         options: {
           data: {
             nombre_completo: nombreCompleto,
-            rol: rol,
+            telefono: telefono,
+            rol: 'cliente',
+            rol_id: 'e20d562b-85ad-440c-8640-d36978cdbcb4',
           },
         },
       });
 
       if (signUpError) throw signUpError;
 
-      // Crear o actualizar perfil en perfiles_usuario
-      if (data.user) {
-        try {
-          await supabase
-            .from('perfiles_usuario')
-            .upsert({
-              id: data.user.id,
-              nombre_completo: nombreCompleto,
-              rol: rol,
-            });
-        } catch {
-          // Si existe un trigger automático en Supabase SQL, ignora la excepción
-        }
-      }
+      // El perfil se crea y asigna su UUID automáticamente de forma segura 
+      // en la base de datos gracias al Trigger 'handle_new_user'.
 
       router.push('/login?mensaje=cuenta-creada');
 
@@ -97,33 +81,7 @@ export default function RegistroPage() {
           Crear una Cuenta
         </h2>
 
-        {/* Selección entre Cliente y Administrador */}
-        <div className="flex bg-gray-100 p-1 rounded-lg mb-6 border border-gray-200">
-          <button
-            type="button"
-            onClick={() => { setRol('cliente'); setError(null); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${
-              rol === 'cliente' 
-                ? 'bg-white text-[#00b24a] shadow-xs' 
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <FontAwesomeIcon icon={faUser} />
-            Cuenta Cliente
-          </button>
-          <button
-            type="button"
-            onClick={() => { setRol('admin'); setError(null); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${
-              rol === 'admin' 
-                ? 'bg-gray-900 text-white shadow-xs' 
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <FontAwesomeIcon icon={faUserShield} />
-            Administrador
-          </button>
-        </div>
+
 
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm text-center font-medium">
@@ -142,6 +100,23 @@ export default function RegistroPage() {
               placeholder="Ej. Juan Pérez"
               value={nombreCompleto}
               onChange={(e) => setNombreCompleto(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#00b24a] focus:border-[#00b24a] transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-800 mb-1.5">
+              Teléfono
+            </label>
+            <input
+              type="tel"
+              required
+              placeholder="Ej. 77712345"
+              value={telefono}
+              onChange={(e) => {
+                const soloNumeros = e.target.value.replace(/[^0-9]/g, '');
+                setTelefono(soloNumeros);
+              }}
               className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#00b24a] focus:border-[#00b24a] transition-colors"
             />
           </div>
@@ -184,31 +159,19 @@ export default function RegistroPage() {
             </div>
           </div>
 
-          {rol === 'admin' && (
-            <div>
-              <label className="block text-sm font-bold text-gray-800 mb-1.5">
-                Clave de Autorización Admin <span className="text-xs text-gray-400 font-normal">(opcional, ej: admin)</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Ingresa 'admin' o déjalo vacío"
-                value={claveAdmin}
-                onChange={(e) => setClaveAdmin(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-gray-50"
-              />
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
-            className={`w-full font-bold py-2.5 rounded-md transition-colors mt-4 disabled:opacity-50 text-white ${
-              rol === 'admin' 
-                ? 'bg-gray-900 hover:bg-gray-800' 
-                : 'bg-[#00b24a] hover:bg-[#009e42]'
-            }`}
+            className="w-full font-bold py-2.5 rounded-md transition-colors mt-4 disabled:opacity-50 text-white bg-[#00b24a] hover:bg-[#009e42] flex items-center justify-center gap-2"
           >
-            {loading ? 'Creando cuenta...' : rol === 'admin' ? 'Registrar Administrador' : 'Registrarme'}
+            {loading ? (
+              <>
+                <FontAwesomeIcon icon={faCircleNotch} spin />
+                Creando cuenta...
+              </>
+            ) : (
+              'Registrarme'
+            )}
           </button>
         </form>
 
