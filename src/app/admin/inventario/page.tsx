@@ -1,5 +1,10 @@
+import { Suspense } from 'react';
 import { InventarioTabla } from './InventarioTabla';
 
 export default function InventarioPage() {
-  return <InventarioTabla />;
+  return (
+    <Suspense>
+      <InventarioTabla />
+    </Suspense>
+  );
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useAdminBusqueda } from '@/components/admin/useAdminBusqueda';
 import { createClient } from '@/utils/supabase/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -61,6 +62,16 @@ export default function OfertasClient({ initialOfertas, productos }: OfertasClie
   const [activo, setActivo] = useState(true);
 
   const supabase = createClient();
+  const { q } = useAdminBusqueda();
+
+  const lista = useMemo(() => {
+    const texto = q.trim().toLowerCase();
+    if (!texto) return ofertas;
+    return ofertas.filter((o) => {
+      const prod = Array.isArray(o.productos) ? o.productos[0] : o.productos;
+      return (prod?.nombre || '').toLowerCase().includes(texto);
+    });
+  }, [ofertas, q]);
 
   // Recargar ofertas desde Supabase
   const reloadOfertas = async () => {
@@ -298,7 +309,7 @@ export default function OfertasClient({ initialOfertas, productos }: OfertasClie
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <h2 className="text-base font-bold text-gray-900">Ofertas Registradas ({ofertas.length})</h2>
+          <h2 className="text-base font-bold text-gray-900">Ofertas Registradas ({lista.length})</h2>
         </div>
 
         <div className="overflow-x-auto">
@@ -315,8 +326,8 @@ export default function OfertasClient({ initialOfertas, productos }: OfertasClie
             </thead>
 
             <tbody className="text-sm text-gray-700 divide-y divide-gray-100">
-              {ofertas.length > 0 ? (
-                ofertas.map((o) => {
+              {lista.length > 0 ? (
+                lista.map((o) => {
                   const prod = Array.isArray(o.productos) ? o.productos[0] : o.productos;
                   const precioOriginal = Number(prod?.precio) || 0;
                   const descuento = Number(o.porcentaje_descuento) || 0;
@@ -382,7 +393,9 @@ export default function OfertasClient({ initialOfertas, productos }: OfertasClie
               ) : (
                 <tr>
                   <td colSpan={6} className="p-12 text-center text-gray-400 font-medium">
-                    No hay ofertas registradas. Haz clic en "Nueva Oferta" para agregar una.
+                    {q.trim()
+                      ? 'No hay ofertas que coincidan con la búsqueda.'
+                      : 'No hay ofertas registradas. Haz clic en "Nueva Oferta" para agregar una.'}
                   </td>
                 </tr>
               )}

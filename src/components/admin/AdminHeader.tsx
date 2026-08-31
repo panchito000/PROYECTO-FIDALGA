@@ -12,13 +12,20 @@ import {
   faRightFromBracket,
   faUserShield 
 } from '@fortawesome/free-solid-svg-icons';
+import { RUTAS_CON_LISTA, useAdminBusqueda } from '@/components/admin/useAdminBusqueda';
 
 export const AdminHeader = () => {
   const [user, setUser] = useState<any>(null);
   const [nombre, setNombre] = useState<string>('Administrador');
   const [showMenu, setShowMenu] = useState<boolean>(false);
+  const { q, aplicar, pathname } = useAdminBusqueda();
+  const [busqueda, setBusqueda] = useState(q);
   const supabase = createClient();
   const router = useRouter();
+
+  useEffect(() => {
+    setBusqueda(q);
+  }, [q]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -51,21 +58,52 @@ export const AdminHeader = () => {
   };
 
   const inicial = nombre.charAt(0).toUpperCase();
+  const mostrarBuscador = RUTAS_CON_LISTA.includes(pathname);
+  const placeholder =
+    pathname === '/admin/pedidos'
+      ? 'Buscar cliente, pedido o producto...'
+      : pathname === '/admin/ofertas'
+        ? 'Buscar oferta por producto...'
+        : 'Buscar producto o SKU...';
 
   return (
     <header className="flex items-center justify-between gap-4 mb-8 relative">
-      {/* Buscador Stylized */}
-      <div className="relative flex-1 max-w-xl">
-        <FontAwesomeIcon 
-          icon={faMagnifyingGlass} 
-          className="text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="Buscar productos, clientes o pedidos..."
-          className="w-full bg-white rounded-full py-2.5 pl-11 pr-4 text-sm text-gray-800 placeholder-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00c653] shadow-xs"
-        />
-      </div>
+      {mostrarBuscador ? (
+        <form
+          className="relative flex-1 max-w-xl"
+          onSubmit={(e) => {
+            e.preventDefault();
+            aplicar(busqueda);
+          }}
+        >
+          <FontAwesomeIcon 
+            icon={faMagnifyingGlass} 
+            className="text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 text-sm"
+          />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => {
+              const valor = e.target.value;
+              setBusqueda(valor);
+              aplicar(valor);
+            }}
+            placeholder={placeholder}
+            className="w-full bg-white rounded-full py-2.5 pl-11 pr-4 text-sm text-gray-800 placeholder-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00c653] shadow-xs"
+          />
+        </form>
+      ) : (
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold text-gray-900">
+            {pathname === '/admin/reportes' ? 'Reportes' : 'Inicio'}
+          </h1>
+          <p className="text-sm text-gray-500">
+            {pathname === '/admin/reportes'
+              ? 'Resumen de ventas, stock y pedidos.'
+              : 'Panel de control del supermercado.'}
+          </p>
+        </div>
+      )}
 
       {/* Perfil & Acciones Header */}
       <div className="flex items-center gap-3 shrink-0 relative">
