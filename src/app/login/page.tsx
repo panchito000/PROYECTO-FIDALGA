@@ -4,12 +4,9 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { leerPerfilRol, puedeEntrarAlPanel } from '@/utils/roles';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEye, faEyeSlash, faUserShield, faUser, faCircleNotch } from '@fortawesome/free-solid-svg-icons';
-
-const ADMIN_ROL_ID = 'd9f76488-9905-459d-adde-0d0e87e5efd9';
-const EMPLEADO_ROL_ID = '703d17fd-bfb6-40d1-b378-98362e9cb3b0';
-const CLIENTE_ROL_ID = 'e20d562b-85ad-440c-8640-d36978cdbcb4';
+import { faEye, faEyeSlash, faCircleNotch } from '@fortawesome/free-solid-svg-icons';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,17 +47,9 @@ export default function LoginPage() {
 
       const user = data.user;
 
-      // Obtener rol del perfil
-      const { data: perfil } = await supabase
-        .from('perfiles_usuario')
-        .select('rol_id')
-        .eq('id', user.id)
-        .single();
+      const perfil = await leerPerfilRol(supabase, user.id);
 
-      const rolUsuario = perfil?.rol_id || user?.user_metadata?.rol_id || CLIENTE_ROL_ID;
-
-      // Redirigir según el rol
-      if (rolUsuario === ADMIN_ROL_ID || rolUsuario === EMPLEADO_ROL_ID) {
+      if (puedeEntrarAlPanel(perfil, user)) {
         router.push('/admin');
       } else {
         router.push('/');

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useEffect, useState } from 'react';
+import { esRolEmpleado, leerPerfilRol } from '@/utils/roles';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faHouse, 
@@ -24,11 +25,14 @@ const items = [
   { href: '/admin/reportes', label: 'Reportes', exact: false, icon: faChartPie },
 ];
 
+const rutasSoloAdmin = ['/admin/ofertas', '/admin/reportes'];
+
 export const AdminSidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const [userEmail, setUserEmail] = useState<string>('');
+  const [esEmpleado, setEsEmpleado] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -36,9 +40,26 @@ export const AdminSidebar = () => {
       if (user?.email) {
         setUserEmail(user.email);
       }
+      if (user?.id) {
+        const perfil = await leerPerfilRol(supabase, user.id);
+        setEsEmpleado(esRolEmpleado(perfil, user));
+      }
     };
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (esEmpleado && rutasSoloAdmin.some((ruta) => pathname.startsWith(ruta))) {
+      router.replace('/admin');
+    }
+  }, [esEmpleado, pathname, router]);
+
+  const menu = items.filter((item) => {
+    if (esEmpleado && rutasSoloAdmin.includes(item.href)) {
+      return false;
+    }
+    return true;
+  });
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -57,7 +78,7 @@ export const AdminSidebar = () => {
 
         {/* Navegación Principal */}
         <nav className="px-3 mt-4 flex flex-col gap-1">
-          {items.map((item) => {
+          {menu.map((item) => {
             const activo = item.exact ? pathname === item.href : pathname.startsWith(item.href);
             return (
               <Link
@@ -81,7 +102,9 @@ export const AdminSidebar = () => {
       <div className="p-3 border-t border-white/20 space-y-2 bg-black/10">
         {userEmail && (
           <div className="px-3 py-1.5 bg-white/10 rounded-xl">
-            <p className="text-[10px] uppercase font-extrabold text-green-200">Administrador</p>
+            <p className="text-[10px] uppercase font-extrabold text-green-200">
+              {esEmpleado ? 'Empleado' : 'Administrador'}
+            </p>
             <p className="text-xs font-bold text-white truncate">{userEmail}</p>
           </div>
         )}

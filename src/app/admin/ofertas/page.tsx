@@ -1,8 +1,18 @@
+import { Suspense } from 'react';
 import { createClient } from '@/utils/supabase/server';
+import { redirect } from 'next/navigation';
 import OfertasClient from '@/app/admin/ofertas/OfertasClient';
+import { esRolEmpleado, leerPerfilRol } from '@/utils/roles';
 
 export default async function AdminOfertasPage() {
   const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const perfil = await leerPerfilRol(supabase, user?.id);
+
+  if (esRolEmpleado(perfil, user)) {
+    redirect('/admin');
+  }
 
   // Fetch productos para el selector
   const { data: productos } = await supabase
@@ -25,9 +35,11 @@ export default async function AdminOfertasPage() {
     .order('created_at', { ascending: false });
 
   return (
-    <OfertasClient 
-      initialOfertas={ofertas || []} 
-      productos={productos || []} 
-    />
+    <Suspense>
+      <OfertasClient 
+        initialOfertas={ofertas || []} 
+        productos={productos || []} 
+      />
+    </Suspense>
   );
 }

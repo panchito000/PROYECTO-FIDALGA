@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
+import { Footer } from '@/components/Footer';
 import { ProductCard } from '@/components/ProductCard';
-import { createClient } from '@/utils/supabase/client';
+import { categoriasService, ofertasService, productosService } from '@/services';
+import { esSeccionOfertas } from '@/services/categoriasService';
 import { useParams } from 'next/navigation';
 
 interface ProductoDB {
@@ -11,57 +13,67 @@ interface ProductoDB {
   nombre: string;
   precio: number;
   imagen_url: string;
+  precioAnterior?: number;
+  porcentaje?: number;
 }
 
 export default function PaginaCategoria() {
   const params = useParams();
-  const nombreCategoria = decodeURIComponent(params.categoria as string);
+  const claveCategoria = decodeURIComponent(params.categoria as string);
 
+  const [titulo, setTitulo] = useState(claveCategoria);
   const [productos, setProductos] = useState<ProductoDB[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const [sinCategoria, setSinCategoria] = useState(false);
 
   useEffect(() => {
     const fetchProductosPorCategoria = async () => {
       setLoading(true);
+      setSinCategoria(false);
       try {
-        const { data: categoriaData, error: catError } = await supabase
-          .from('categorias')
-          .select('id')
-          .eq('nombre', nombreCategoria)
-          .single(); 
-
-        if (catError) {
-          setLoading(false);
+        if (esSeccionOfertas(claveCategoria)) {
+          setTitulo('Ofertas');
+          const ofertas = await ofertasService.getOfertasActivas();
+          setProductos(
+            ofertas.map((o: any) => ({
+              id: String(o.id),
+              nombre: String(o.nombre ?? ''),
+              imagen_url: String(o.imagen_url ?? ''),
+              precio: Number(o.precioDescuento ?? o.precio ?? 0),
+              precioAnterior: Number(o.precioOriginal || 0) || undefined,
+              porcentaje: Number(o.porcentajeDescuento || 0) || undefined,
+            }))
+          );
           return;
         }
 
-        const { data: productosData, error: prodError } = await supabase
-          .from('productos')
-          .select('id, nombre, precio, imagen_url')
-          .eq('estado', true)
-          .eq('categoria_id', categoriaData.id);
-
-        if (prodError) throw prodError;
-
-        if (productosData) {
-          const productosProcesados = productosData.map((prod: any) => ({
-            id: prod.id,
-            nombre: prod.nombre,
-            imagen_url: prod.imagen_url,
-            precio: Number(prod.precio) || 0,
-          }));
-          setProductos(productosProcesados as ProductoDB[]);
+        const categoria = await categoriasService.buscarCategoria(claveCategoria);
+        if (!categoria) {
+          setSinCategoria(true);
+          setProductos([]);
+          return;
         }
+
+        setTitulo(categoria.nombre);
+        const productosData = await productosService.getProductosPorCategoria(categoria.id);
+        setProductos(
+          (productosData || []).map((prod: Record<string, unknown>) => ({
+            id: String(prod.id),
+            nombre: String(prod.nombre ?? ''),
+            imagen_url: String(prod.imagen_url ?? ''),
+            precio: Number(prod.precio) || 0,
+          }))
+        );
       } catch (error) {
         console.error('Error cargando los productos:', error);
+        setProductos([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchProductosPorCategoria();
-  }, [nombreCategoria]);
+  }, [claveCategoria]);
 
   if (loading) {
     return (
@@ -81,10 +93,10 @@ export default function PaginaCategoria() {
         
         <div className="mb-8 border-b border-gray-200 pb-4">
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 capitalize">
-            {nombreCategoria}
+            {titulo}
           </h1>
           <p className="text-gray-500 mt-2 text-sm sm:text-base">
-            Explora todos los productos de la sección {nombreCategoria.toLowerCase()}.
+            Explora todos los productos de la sección {titulo.toLowerCase()}.
           </p>
         </div>
 
@@ -96,17 +108,24 @@ export default function PaginaCategoria() {
                 id={product.id} 
                 nombre={product.nombre} 
                 precio={product.precio} 
-                imagen_url={product.imagen_url} 
+                imagen_url={product.imagen_url}
+                precioAnterior={product.precioAnterior}
+                porcentaje={product.porcentaje}
               />
             ))}
           </div>
         ) : (
           <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-gray-100">
-            <h2 className="text-xl text-gray-600 font-medium">No se encontraron productos en esta categoría.</h2>
+            <h2 className="text-xl text-gray-600 font-medium">
+              {sinCategoria
+                ? 'No se encontró esta categoría.'
+                : 'No se encontraron productos en esta categoría.'}
+            </h2>
             <p className="text-gray-400 mt-2">Intenta volver más tarde o explora otras secciones.</p>
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { useAdminBusqueda } from '@/components/admin/useAdminBusqueda';
 
 type Categoria = {
   id: string;
@@ -20,6 +21,8 @@ type Producto = {
   activo: boolean;
 };
 
+const POR_PAGINA = [10, 15, 20] as const;
+
 function nombreCategoria(c: Record<string, unknown>) {
   return String(c.nombre ?? c.name ?? c.titulo ?? c.id ?? '');
 }
@@ -28,12 +31,14 @@ function nombreCategoria(c: Record<string, unknown>) {
 export const InventarioTabla = () => {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [filtro, setFiltro] = useState('');
   const [categoriaId, setCategoriaId] = useState('todas');
+  const { q } = useAdminBusqueda();
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editando, setEditando] = useState<Producto | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState<(typeof POR_PAGINA)[number]>(15);
 
   const supabase = createClient();
 
@@ -94,13 +99,31 @@ export const InventarioTabla = () => {
 
   // Filtrar productos por búsqueda o categoría
   const lista = useMemo(() => {
+    const busqueda = q.trim().toLowerCase();
     return productos.filter((p) => {
       const texto = `${p.sku} ${p.nombre}`.toLowerCase();
-      const okTexto = texto.includes(filtro.toLowerCase());
+      const okTexto = !busqueda || texto.includes(busqueda);
       const okCat = categoriaId === 'todas' || p.categoria_id === categoriaId;
       return okTexto && okCat;
     });
-  }, [productos, filtro, categoriaId]);
+  }, [productos, q, categoriaId]);
+
+  useEffect(() => {
+    setPagina(1);
+  }, [q, categoriaId, porPagina]);
+
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / porPagina));
+  const paginaActual = Math.min(pagina, totalPaginas);
+
+  useEffect(() => {
+    if (pagina > totalPaginas) setPagina(totalPaginas);
+  }, [pagina, totalPaginas]);
+  const desde = lista.length === 0 ? 0 : (paginaActual - 1) * porPagina + 1;
+  const hasta = Math.min(paginaActual * porPagina, lista.length);
+  const paginaItems = useMemo(
+    () => lista.slice((paginaActual - 1) * porPagina, paginaActual * porPagina),
+    [lista, paginaActual, porPagina]
+  );
 
   // Guardar o actualizar producto
   const guardar = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -113,14 +136,14 @@ export const InventarioTabla = () => {
     const nuevoNombre = String(data.get('nombre'));
     const nuevoSku = String(data.get('sku'));
     const nuevaCategoriaId = String(data.get('categoria_id'));
-    const nuevaImagenUrl = String(data.get('imagen_url') || '');
+    const nuevaImagenUrl = String(data.get('imagen_url') || '').trim();
 
     const payload = {
       nombre: nuevoNombre,
       precio: nuevoPrecio,
       stock: nuevoStock,
       categoria_id: nuevaCategoriaId,
-      imagen_url: nuevaImagenUrl,
+      imagen_url: nuevaImagenUrl || null,
       sku: nuevoSku,
     };
 
@@ -219,18 +242,6 @@ export const InventarioTabla = () => {
       )}
 
       <div className="flex flex-wrap items-center gap-3 mb-5">
-        <div className="relative flex-1 min-w-55">
-          <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-            placeholder="Filtrar inventario..."
-            className="w-full bg-white border border-gray-200 rounded-lg py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#22c55e]"
-          />
-        </div>
-
         <select
           value={categoriaId}
           onChange={(e) => setCategoriaId(e.target.value)}
@@ -256,98 +267,152 @@ export const InventarioTabla = () => {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full text-sm text-left">
-          <thead>
-            <tr className="text-gray-400 font-medium">
-              <th className="py-3 px-4">SKU</th>
-              <th className="py-3 px-4">Producto</th>
-              <th className="py-3 px-4">Categoría</th>
-              <th className="py-3 px-4">Precio</th>
-              <th className="py-3 px-4">Stock</th>
-              <th className="py-3 px-4">Estado</th>
-              <th className="py-3 px-4"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {cargando && (
-              <tr>
-                <td colSpan={7} className="py-8 text-center text-gray-400">
-                  Cargando...
-                </td>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-auto max-h-[min(58vh,560px)]">
+          <table className="w-full text-sm text-left">
+            <thead className="sticky top-0 z-10 bg-white">
+              <tr className="text-gray-400 font-medium border-b border-gray-100">
+                <th className="py-3 px-4">SKU</th>
+                <th className="py-3 px-4">Producto</th>
+                <th className="py-3 px-4">Categoría</th>
+                <th className="py-3 px-4">Precio</th>
+                <th className="py-3 px-4">Stock</th>
+                <th className="py-3 px-4">Estado</th>
+                <th className="py-3 px-4"></th>
               </tr>
-            )}
-            {!cargando && lista.length === 0 && (
-              <tr>
-                <td colSpan={7} className="py-8 text-center text-gray-400">
-                  No hay productos. Usa + Nuevo Producto.
-                </td>
-              </tr>
-            )}
-            {lista.map((p) => (
-              <tr key={p.id ?? p.sku} className="border-t border-gray-100">
-                <td className="py-3 px-4 text-gray-700">{p.sku}</td>
-                <td className="py-3 px-4">
-                  <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded bg-gray-100 shrink-0 overflow-hidden border flex items-center justify-center">
-                      {p.imagen_url ? (
-                        <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-contain p-0.5" />
-                      ) : (
-                        <span className="text-[10px] text-gray-400">Img</span>
-                      )}
-                    </span>
-                    <span className="font-medium text-gray-800">{p.nombre}</span>
-                  </div>
-                </td>
-                <td className="py-3 px-4 text-gray-600">{p.categoria}</td>
-                <td className="py-3 px-4 text-gray-800">Bs. {Number(p.precio).toFixed(2)}</td>
-                <td className="py-3 px-4 text-gray-800 font-semibold">{p.stock}</td>
-                <td className="py-3 px-4">
-                  <button
-                    type="button"
-                    onClick={() => cambiarEstado(p)}
-                    title="Cambiar estado"
-                    className={`w-10 h-6 rounded-full relative transition-colors ${
-                      p.activo ? 'bg-[#f5c400]' : 'bg-gray-300'
-                    }`}
-                    aria-label="cambiar estado"
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                        p.activo ? 'translate-x-4' : ''
+            </thead>
+            <tbody>
+              {cargando && (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-gray-400">
+                    Cargando...
+                  </td>
+                </tr>
+              )}
+              {!cargando && lista.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-gray-400">
+                    No hay productos. Usa + Nuevo Producto.
+                  </td>
+                </tr>
+              )}
+              {!cargando && paginaItems.map((p) => (
+                <tr key={p.id ?? p.sku} className="border-t border-gray-100">
+                  <td className="py-3 px-4 text-gray-700">{p.sku}</td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <span className="w-9 h-9 rounded bg-gray-100 shrink-0 overflow-hidden border flex items-center justify-center">
+                        {p.imagen_url ? (
+                          <img
+                            src={p.imagen_url}
+                            alt={p.nombre}
+                            className="w-full h-full object-contain p-0.5"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <span className="text-[10px] text-gray-400">Img</span>
+                        )}
+                      </span>
+                      <span className="font-medium text-gray-800">{p.nombre}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-gray-600">{p.categoria}</td>
+                  <td className="py-3 px-4 text-gray-800">Bs. {Number(p.precio).toFixed(2)}</td>
+                  <td className="py-3 px-4 text-gray-800 font-semibold">{p.stock}</td>
+                  <td className="py-3 px-4">
+                    <button
+                      type="button"
+                      onClick={() => cambiarEstado(p)}
+                      title="Cambiar estado"
+                      className={`w-10 h-6 rounded-full relative transition-colors ${
+                        p.activo ? 'bg-[#f5c400]' : 'bg-gray-300'
                       }`}
-                    />
-                  </button>
-                </td>
-                <td className="py-3 px-4">
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditando(p);
-                        setMostrarForm(true);
-                      }}
-                      className="w-8 h-8 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center"
+                      aria-label="cambiar estado"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.232 5.232l3.536 3.536M4 20h4.586a1 1 0 00.707-.293l9.414-9.414a2 2 0 000-2.828l-3.172-3.172a2 2 0 00-2.828 0L4.293 13.707A1 1 0 004 14.414V20z" />
-                      </svg>
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                          p.activo ? 'translate-x-4' : ''
+                        }`}
+                      />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => borrar(p.id)}
-                      className="w-8 h-8 rounded-md bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 flex items-center justify-center"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4h6v3m-9 0h12" />
-                      </svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditando(p);
+                          setMostrarForm(true);
+                        }}
+                        className="w-8 h-8 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.232 5.232l3.536 3.536M4 20h4.586a1 1 0 00.707-.293l9.414-9.414a2 2 0 000-2.828l-3.172-3.172a2 2 0 00-2.828 0L4.293 13.707A1 1 0 004 14.414V20z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => borrar(p.id)}
+                        className="w-8 h-8 rounded-md bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 flex items-center justify-center"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4h6v3m-9 0h12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {!cargando && lista.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-gray-100 text-sm text-gray-600">
+            <p>
+              Mostrando {desde}–{hasta} de {lista.length} productos
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2">
+                <span>Por página</span>
+                <select
+                  value={porPagina}
+                  onChange={(e) => setPorPagina(Number(e.target.value) as (typeof POR_PAGINA)[number])}
+                  className="bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#22c55e]"
+                >
+                  {POR_PAGINA.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={paginaActual <= 1}
+                  onClick={() => setPagina(paginaActual - 1)}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Anterior
+                </button>
+                <span className="px-2 text-gray-500">
+                  {paginaActual} / {totalPaginas}
+                </span>
+                <button
+                  type="button"
+                  disabled={paginaActual >= totalPaginas}
+                  onClick={() => setPagina(paginaActual + 1)}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {mostrarForm && (
@@ -376,7 +441,15 @@ export const InventarioTabla = () => {
             </select>
             
             <label className="block text-sm font-semibold mb-1">URL de la Imagen</label>
-            <input name="imagen_url" defaultValue={editando?.imagen_url} placeholder="https://ejemplo.com/imagen.png" className="w-full border rounded-lg px-3 py-2 mb-3 text-sm" />
+            <input
+              name="imagen_url"
+              defaultValue={editando?.imagen_url}
+              placeholder="https://i.postimg.cc/..../foto.webp"
+              className="w-full border rounded-lg px-3 py-2 mb-1 text-sm"
+            />
+            <p className="text-xs text-gray-400 mb-3">
+              No pegues la página del producto. Entra a la foto, clic derecho → Copiar dirección de la imagen.
+            </p>
 
             <label className="block text-sm font-semibold mb-1">Precio</label>
             <input name="precio" type="number" step="0.01" defaultValue={editando?.precio} required className="w-full border rounded-lg px-3 py-2 mb-3 text-sm" />
