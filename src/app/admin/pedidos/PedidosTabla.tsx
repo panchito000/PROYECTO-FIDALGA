@@ -156,7 +156,7 @@ export const PedidosTabla = () => {
     setGuardandoId(pedidoId);
     try {
       const guardado = await pedidosService.actualizarEstado(pedidoId, nuevoEstado);
-      const estadoGuardado = guardado.estado_pedido || guardado.estado || nuevoEstado;
+      const estadoGuardado = guardado.estado_pedido || nuevoEstado;
       setPedidos((prev) =>
         prev.map((p) => (p.id === pedidoId ? { ...p, estado_pedido: estadoGuardado } : p))
       );
