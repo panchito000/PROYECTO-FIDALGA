@@ -1,29 +1,60 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { 
   faTimes, faWineBottle, faCheese, faBreadSlice, faBasketShopping, 
-  faPumpSoap, faBabyCarriage, faBroom, faSnowflake 
+  faPumpSoap, faBabyCarriage, faBroom, faSnowflake, faTag
 } from '@fortawesome/free-solid-svg-icons';
+import { categoriasService, esSeccionOfertas, normalizarNombreCategoria } from '@/services/categoriasService';
 
 interface CategorySidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const FALLBACK = [
+  { id: 'ofertas', name: 'Ofertas' },
+  { id: 'bebidas', name: 'Bebidas' },
+  { id: 'lacteos', name: 'Lácteos' },
+  { id: 'panaderia', name: 'Panadería' },
+  { id: 'abarrotes', name: 'Abarrotes' },
+  { id: 'cuidado', name: 'Cuidado' },
+  { id: 'bebes', name: 'Bebés' },
+  { id: 'limpieza', name: 'Limpieza' },
+  { id: 'frio', name: 'Frío' },
+];
+
+function iconoDeCategoria(nombre: string): IconDefinition {
+  const n = normalizarNombreCategoria(nombre);
+  if (n.includes('bebida')) return faWineBottle;
+  if (n.includes('lacteo')) return faCheese;
+  if (n.includes('pan')) return faBreadSlice;
+  if (n.includes('abarrote')) return faBasketShopping;
+  if (n.includes('cuidado')) return faPumpSoap;
+  if (n.includes('bebe')) return faBabyCarriage;
+  if (n.includes('limpia')) return faBroom;
+  if (n.includes('frio') || n.includes('congel') || n.includes('hielo')) return faSnowflake;
+  if (n.includes('oferta')) return faTag;
+  return faBasketShopping;
+}
+
 export const CategorySidebar = ({ isOpen, onClose }: CategorySidebarProps) => {
-  const categorias = [
-    { id: 1, name: 'Bebidas', icon: faWineBottle },
-    { id: 2, name: 'Lácteos', icon: faCheese },
-    { id: 3, name: 'Panadería', icon: faBreadSlice },
-    { id: 4, name: 'Abarrotes', icon: faBasketShopping },
-    { id: 5, name: 'Cuidado', icon: faPumpSoap },
-    { id: 6, name: 'Bebés', icon: faBabyCarriage },
-    { id: 7, name: 'Limpieza', icon: faBroom },
-    { id: 8, name: 'Frío', icon: faSnowflake },
-  ];
+  const [categorias, setCategorias] = useState(FALLBACK);
+
+  useEffect(() => {
+    categoriasService
+      .getCategorias()
+      .then((rows) => {
+        const desdeDb = rows
+          .filter((c) => !esSeccionOfertas(c.nombre))
+          .map((c) => ({ id: String(c.id), name: c.nombre }));
+        setCategorias([{ id: 'ofertas', name: 'Ofertas' }, ...desdeDb]);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <>
@@ -50,7 +81,7 @@ export const CategorySidebar = ({ isOpen, onClose }: CategorySidebarProps) => {
                   className="flex items-center gap-4 px-6 py-3 text-gray-700 hover:bg-green-50 hover:text-[#00c653] transition-colors group border-b border-gray-100 last:border-0"
                 >
                   <div className="w-8 h-8 flex items-center justify-center text-gray-400 group-hover:text-[#00c653] transition-colors">
-                    <FontAwesomeIcon icon={cat.icon} className="text-xl" />
+                    <FontAwesomeIcon icon={iconoDeCategoria(cat.name)} className="text-xl" />
                   </div>
                   <span className="font-medium text-sm">{cat.name}</span>
                 </Link>

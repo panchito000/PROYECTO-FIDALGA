@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/client';
+import { categoriasService, coincideCategoria } from '@/services/categoriasService';
 
 export interface ProductoData {
   id?: string;
@@ -44,24 +45,21 @@ export const productosService = {
 
   // Filtrar y retornar productos pertenecientes a una categoría específica
   async getProductosPorCategoria(nombreCategoria: string) {
-    const supabase = createClient();
+    const categoria = await categoriasService.buscarCategoria(nombreCategoria);
+    if (!categoria) return [];
 
-    const { data: categoriaData, error: catError } = await supabase
-      .from('categorias')
-      .select('id')
-      .eq('nombre', nombreCategoria)
-      .single();
+    const res = await fetch('/api/productos');
+    const data = await res.json();
+    if (!res.ok || !Array.isArray(data)) return [];
 
-    if (catError || !categoriaData) return [];
-
-    const { data: productos, error: prodError } = await supabase
-      .from('productos')
-      .select('id, nombre, precio, imagen_url')
-      .eq('estado', true)
-      .eq('categoria_id', categoriaData.id);
-
-    if (prodError) throw prodError;
-    return productos || [];
+    return data.filter((p: Record<string, unknown>) => {
+      const rel = p.categorias as { id?: string; nombre?: string } | null;
+      return (
+        String(p.categoria_id ?? '') === String(categoria.id) ||
+        String(rel?.id ?? '') === String(categoria.id) ||
+        coincideCategoria(String(rel?.nombre ?? ''), categoria.nombre)
+      );
+    });
   },
 
   // Insertar un nuevo producto en el catálogo

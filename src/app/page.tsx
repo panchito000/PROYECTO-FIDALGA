@@ -3,13 +3,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { Navbar } from '@/components/Navbar';
+import { Footer } from '@/components/Footer';
 import { ProductCard } from '@/components/ProductCard';
-import { ofertasService, productosService } from '@/services';
+import { categoriasService, ofertasService, productosService } from '@/services';
+import { esSeccionOfertas, normalizarNombreCategoria } from '@/services/categoriasService';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faWineBottle, faCheese, faBreadSlice, faBasketShopping, 
-  faPumpSoap, faBabyCarriage, faBroom, faSnowflake,
+  faPumpSoap, faBabyCarriage, faBroom, faSnowflake, faTag,
   faChevronLeft, faChevronRight 
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -18,11 +20,14 @@ interface ProductoDisplay {
   nombre: string;
   precio: number;
   imagen_url: string;
+  precioAnterior?: number;
+  porcentaje?: number;
 }
 
 export default function HomeLandingPage() {
   const [ofertas, setOfertas] = useState<ProductoDisplay[]>([]);
   const [novedades, setNovedades] = useState<ProductoDisplay[]>([]);
+  const [nombresCategorias, setNombresCategorias] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const ofertasRef = useRef<HTMLDivElement | null>(null);
@@ -50,6 +55,8 @@ export default function HomeLandingPage() {
           nombre: o.nombre,
           precio: o.precioDescuento,
           imagen_url: o.imagen_url,
+          precioAnterior: o.precioOriginal,
+          porcentaje: o.porcentajeDescuento,
         })));
 
         const dataNovedades = await productosService.getNovedades(8);
@@ -59,6 +66,11 @@ export default function HomeLandingPage() {
           precio: Number(p.precio) || 0,
           imagen_url: p.imagen_url,
         })));
+
+        const cats = await categoriasService.getCategorias();
+        if (cats.length > 0) {
+          setNombresCategorias(cats.map((c) => c.nombre));
+        }
 
       } catch (error) {
         console.error('Error cargando inicio:', error);
@@ -72,27 +84,27 @@ export default function HomeLandingPage() {
 
   const iconClasses = "w-10 h-10 sm:w-12 sm:h-12 text-gray-500 group-hover:text-[#00c653] transition-colors duration-300";
 
-  const categorias = [
-    { id: 1, name: 'Bebidas', icon: <FontAwesomeIcon icon={faWineBottle} className={iconClasses} /> },
-    { id: 2, name: 'Lácteos', icon: <FontAwesomeIcon icon={faCheese} className={iconClasses} /> },
-    { id: 3, name: 'Panadería', icon: <FontAwesomeIcon icon={faBreadSlice} className={iconClasses} /> },
-    { id: 4, name: 'Abarrotes', icon: <FontAwesomeIcon icon={faBasketShopping} className={iconClasses} /> },
-    { id: 5, name: 'Cuidado', icon: <FontAwesomeIcon icon={faPumpSoap} className={iconClasses} /> },
-    { id: 6, name: 'Bebés', icon: <FontAwesomeIcon icon={faBabyCarriage} className={iconClasses} /> },
-    { id: 7, name: 'Limpieza', icon: <FontAwesomeIcon icon={faBroom} className={iconClasses} /> },
-    { id: 8, name: 'Frío', icon: <FontAwesomeIcon icon={faSnowflake} className={iconClasses} /> },
-  ];
+  const iconoPorNombre = (nombre: string) => {
+    const n = normalizarNombreCategoria(nombre);
+    if (n.includes('bebida')) return faWineBottle;
+    if (n.includes('lacteo')) return faCheese;
+    if (n.includes('pan')) return faBreadSlice;
+    if (n.includes('abarrote')) return faBasketShopping;
+    if (n.includes('cuidado')) return faPumpSoap;
+    if (n.includes('bebe')) return faBabyCarriage;
+    if (n.includes('limpia')) return faBroom;
+    if (n.includes('frio') || n.includes('congel') || n.includes('hielo')) return faSnowflake;
+    if (n.includes('oferta')) return faTag;
+    return faBasketShopping;
+  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col">
-        <Navbar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[#00c653]"></div>
-        </div>
-      </div>
-    );
-  }
+  const categorias = ['Ofertas', ...(nombresCategorias.length > 0
+    ? nombresCategorias.filter((n) => !esSeccionOfertas(n))
+    : ['Bebidas', 'Lácteos', 'Panadería', 'Abarrotes', 'Cuidado', 'Bebés', 'Limpieza', 'Frío']
+  )].map((name) => ({
+    name,
+    icon: <FontAwesomeIcon icon={iconoPorNombre(name)} className={iconClasses} />,
+  }));
 
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
@@ -113,6 +125,9 @@ export default function HomeLandingPage() {
         <section>
           <div className="flex justify-between items-end mb-6 border-b border-gray-200 pb-2">
             <h2 className="text-2xl sm:text-3xl font-bold text-red-600">Ofertas</h2>
+            <Link href="/categorias/Ofertas" className="text-sm text-gray-800 underline underline-offset-2 hover:text-[#00c653]">
+              Ver Más
+            </Link>
           </div>
           
           <div className="relative group">
@@ -124,10 +139,24 @@ export default function HomeLandingPage() {
             </button>
 
             <div ref={ofertasRef} className="flex gap-4 overflow-x-auto pb-4 snap-x hide-scroll">
-              {ofertas.map((product) => (
-                <ProductCard key={product.id} id={product.id} nombre={product.nombre} precio={product.precio} imagen_url={product.imagen_url} />
+              {loading && (
+                <div className="py-10 w-full flex justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c653]" />
+                </div>
+              )}
+              {!loading && ofertas.map((product) => (
+                <div key={product.id} className="w-40 sm:w-48 shrink-0 snap-start">
+                  <ProductCard
+                    id={product.id}
+                    nombre={product.nombre}
+                    precio={product.precio}
+                    imagen_url={product.imagen_url}
+                    precioAnterior={product.precioAnterior}
+                    porcentaje={product.porcentaje}
+                  />
+                </div>
               ))}
-              {ofertas.length === 0 && <p className="text-gray-400 text-sm">No hay ofertas activas hoy.</p>}
+              {!loading && ofertas.length === 0 && <p className="text-gray-400 text-sm">No hay ofertas activas hoy.</p>}
             </div>
 
             <button 
@@ -147,7 +176,7 @@ export default function HomeLandingPage() {
           <div className="grid grid-cols-4 lg:grid-cols-8 gap-4 sm:gap-6 text-center">
             {categorias.map(cat => (
               <Link 
-                key={cat.id} 
+                key={cat.name} 
                 href={`/categorias/${encodeURIComponent(cat.name)}`} 
                 className="flex flex-col items-center gap-2 group cursor-pointer"
               >
@@ -177,10 +206,17 @@ export default function HomeLandingPage() {
             </button>
 
             <div ref={novedadesRef} className="flex gap-4 overflow-x-auto pb-4 snap-x hide-scroll">
-              {novedades.map((product) => (
-                <ProductCard key={product.id} id={product.id} nombre={product.nombre} precio={product.precio} imagen_url={product.imagen_url} />
+              {loading && (
+                <div className="py-10 w-full flex justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00c653]" />
+                </div>
+              )}
+              {!loading && novedades.map((product) => (
+                <div key={product.id} className="w-40 sm:w-48 shrink-0 snap-start">
+                  <ProductCard id={product.id} nombre={product.nombre} precio={product.precio} imagen_url={product.imagen_url} />
+                </div>
               ))}
-              {novedades.length === 0 && <p className="text-gray-400 text-sm">No hay novedades registradas.</p>}
+              {!loading && novedades.length === 0 && <p className="text-gray-400 text-sm">No hay novedades registradas.</p>}
             </div>
 
             <button 
@@ -192,6 +228,8 @@ export default function HomeLandingPage() {
           </div>
         </section>
       </main>
+
+      <Footer categorias={['Ofertas', ...nombresCategorias.filter((n) => !esSeccionOfertas(n))]} />
 
       <style dangerouslySetInnerHTML={{__html: `.hide-scroll::-webkit-scrollbar { display: none; } .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }`}} />
     </div>
